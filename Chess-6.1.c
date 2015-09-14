@@ -36,8 +36,9 @@ int evalBoard(void);
 
 int main(void){
 	int count, row[MOVELIMIT], col[MOVELIMIT], moveNumber[MOVELIMIT], scoreToBeat[4][MOVELIMIT], score, i, j, move;
+	FILE* outfile;
 
-	printf("Welcome to Chess-6.0!\nIf you would like to move your pawn from A2 to A4, enter a2a4 as your move.\nTo castle, move your king to his end location.\nTo undo your last move, type UNDO.\nTo access these instructions during the game, type INFO.\nI think that is all... Good Luck!\n\n");
+	printf("Welcome to Chess-6.1!\nIf you would like to move your pawn from A2 to A4, enter 'a2a4' as your move.\nTo castle, move your king to his end location.\nTo undo your last move, type 'UNDO'.\nTo access these instructions during the game, type 'INFO'.\nIf you would like to load a saved game, type 'LOAD'.\nI think that is all... Good Luck!\n\n");
 
 	while(1){
 		promptMove();
@@ -132,6 +133,14 @@ int main(void){
 			printf("\n");
 		}
 		printf("\n");
+
+		outfile = fopen("saved_game.txt","w");
+		for(i=0;i<8;i++){
+			for(j=0;j<8;j++)
+				fprintf(outfile,"%2i ",officialBoard[i][j]);
+			fprintf(outfile,"\n");
+		}
+		fclose(outfile);
 	}//:end of game
 	return 0;
 }
@@ -139,6 +148,9 @@ int main(void){
 //returns 1 if successful, else 0:
 int movePiece(int row, int col, int skipto){
 	int i, moveNum=0;
+
+	if(board[row][col]==E)
+		return 0;
 
 	if(board[row][col]<E){
 		if(board[row][col]==BP){
@@ -1258,13 +1270,33 @@ int evalBoard(void){
 void promptMove(void){
 	char move[5];
 	int row1, col1, row2, col2, newPiece, i, j;
+	FILE* infile;
 	printf("\nWhite, it's your move.\n");
 	scanf("%s",move);
 
 	if(move[0]=='I' || move[0]=='i'){
-		printf("\nIf you would like to move your pawn from A2 to A4, enter a2a4 as your move.\nTo castle, move your king to his end location.\nTo undo your last move, type UNDO.\n\n\nWhite, it's your move.\n");
+		printf("\nIf you would like to move your pawn from A2 to A4, enter 'a2a4' as your move.\nTo castle, move your king to his end location.\nTo undo your last move, type 'UNDO'.\nIf you would like to load a saved game, type 'LOAD'.\n\n\nWhite, it's your move.\n");
 		scanf("%s",move);
 	}
+
+	if(move[0]=='L' || move[0]=='l'){
+		infile = fopen("saved_game.txt","r");
+		if(infile==NULL)
+			printf("\nNothing to load...\nWhite, it's your move.\n");
+		else{
+			for(i=0;i<64;i++)
+				fscanf(infile,"%i",&officialBoard[i/8][i%8]);
+			for(i=0;i<8;i++){
+				for(j=0;j<8;j++)
+					printf("%2i ",officialBoard[i][j]);
+				printf("\n");
+			}
+			printf("\n\nWhite, it's your move.\n");
+			fclose(infile);
+		}
+		scanf("%s",move);
+	}
+
 	if(move[0]=='U' || move[0]=='u'){
 		printf("\n");
 		for(i=0;i<8;i++){
