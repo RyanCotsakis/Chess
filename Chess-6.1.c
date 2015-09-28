@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+//definition of pieces. E == Empty space. The program will display the values of each piece when displaying the board.
 #define BP -1
 #define BR -2
 #define BN -3
@@ -15,7 +16,10 @@
 #define WK 6
 #define E 0
 
-#define MOVELIMIT 5 //{3,5}
+//number of moves to look ahead. Must be odd to ensure the program ends on a black move.
+#define MOVELIMIT 5
+//when evaluating future situations, the program will check to see if the score is better/worse than the best score for that branch of moves.
+//if the branch of moves has not been evaluated, the best score will be SENTINEL which is larger than any possible best score.
 #define SENTINEL 3142
 
 //OFFICIAL SETUP:
@@ -30,7 +34,7 @@ int oldBoard[8][8]={{BR,BN,BB,BQ,BK,BB,BN,BR},{BP,BP,BP,BP,BP,BP,BP,BP},
 int board[8][8];
 
 int movePiece(int row, int col, int skipto);
-void promptMove(void);//:goes to official board
+void promptMove(void);
 int evalBoard(void);
 
 
@@ -41,7 +45,7 @@ int main(void){
 	printf("Welcome to Chess-6.1!\nIf you would like to move your pawn from A2 to A4, enter 'a2a4' as your move.\nTo castle, move your king to his end location.\nTo undo your last move, type 'UNDO'.\nTo access these instructions during the game, type 'INFO'.\nIf you would like to load a saved game, type 'LOAD'.\nI think that is all... Good Luck!\n\n");
 
 	while(1){
-		promptMove();
+		promptMove(); //get move from user. Move applies to officialBoard.
 		
 		//setup "board":
 		for(i=0; i<8; i++){
@@ -57,21 +61,28 @@ int main(void){
 			scoreToBeat[0][count]=SENTINEL;
 		}
 
-		for(count=0;count>=0;count--){
+		for(count=0;count>=0;count--){ //count is (number of moves ahead of current status)-1
 			while(row[count]<8){
 				while(col[count]<8){
-					while(1){
-						i=board[row[count]][col[count]];
-						if((!(count%2) && i<E) || (count%2 && i>E)){
-							move=movePiece(row[count],col[count],moveNumber[count]);
-							if(move && count==MOVELIMIT-1){
+					while(1){ //in this loop while it is possible to move the piece at this row, column, and on this move.
+
+						i=board[row[count]][col[count]]; //for the sake of speed and readablity
+
+						if((!(count%2) && i<E) || (count%2 && i>E)){ //if the move number is even and the piece is black / the move number is odd and the piece is white
+
+							move=movePiece(row[count],col[count],moveNumber[count]); //if this specif move is possible, move=1, else move=0;
+
+							if(move && count==MOVELIMIT-1){	//if this is the end of the branch
+
+								//evaluate the board:
 								score=evalBoard();
-								if(score<scoreToBeat[0][MOVELIMIT-1] || scoreToBeat[0][MOVELIMIT-1]==SENTINEL){
+								if(score<scoreToBeat[0][MOVELIMIT-1] || scoreToBeat[0][MOVELIMIT-1]==SENTINEL){ //if black discovered a sweet resulting board that is more negative than the others at the end of this branch
 									scoreToBeat[0][MOVELIMIT-1]=score;
 									scoreToBeat[1][MOVELIMIT-1]=row[0];
 									scoreToBeat[2][MOVELIMIT-1]=col[0];
 									scoreToBeat[3][MOVELIMIT-1]=moveNumber[0];
 								}
+
 								//reset board up to MOVELIMIT-2 and keep count at MOVELIMIT-1:
 								for(i=0;i<8;i++){
 									for(j=0;j<8;j++)
@@ -80,28 +91,35 @@ int main(void){
 								for(i=0;i<MOVELIMIT-1;i++)
 									movePiece(row[i],col[i],moveNumber[i]);
 								moveNumber[count]++;
+
 							}
-							else if(move){
-								count++;
+
+							else if(move){ //if we can move, and can continue with deeper analysis
+								count++; //go deeper
 								row[count]=0;
 								col[count]=0;
 								moveNumber[count]=0;
 							}
-							else
+
+							else //move == 0: No more available moves for this piece
 								break;
 						}
-						else
+
+						else //don't want to look at this space on this turn
 							break;
 					}
 					col[count]++;
 					moveNumber[count]=0;
+
 				}
 				row[count]++;
 				col[count]=0;
 				moveNumber[count]=0;
+
 			}
 
-			//reset board up to count-2... idk but dont change count:
+			//We just finished looking at all the spaces on this move number, and all that can result from this configuration of board.
+			//Reset to just after count-2 because we want to modify the move done on count-1, once. We were just modifying moves on count.
 			for(i=0;i<8;i++){
 				for(j=0;j<8;j++)
 					board[i][j]=officialBoard[i][j];
@@ -110,23 +128,28 @@ int main(void){
 				movePiece(row[i],col[i],moveNumber[i]);
 
 			//do some best move sheit:
-			if((!(count%2) && count && scoreToBeat[0][count-1]<scoreToBeat[0][count]) || (count%2 && scoreToBeat[0][count-1]>scoreToBeat[0][count]) || (scoreToBeat[0][count-1]==SENTINEL && count)){//count is even || odd || count-1 is emptcol
+			//if we were evaluating black moves, we still have more checking to do (count>0), and the best move black could have done is really poor, make that the best move for white, given the previous conditions of the board.
+			//or if we were evaluating white moves, and the best move white could have done is really poor, make that the best move for black, given the previous conditions of the board.
+			//or if this is the first time we have evaluated a move on this level
+			if((!(count%2) && count && scoreToBeat[0][count-1]<scoreToBeat[0][count]) || (count%2 && scoreToBeat[0][count-1]>scoreToBeat[0][count]) || (count && scoreToBeat[0][count-1]==SENTINEL)){
 				for(i=0;i<4;i++)
 					scoreToBeat[i][count-1]=scoreToBeat[i][count];
 			}
 			scoreToBeat[0][count]=SENTINEL;
 
-			if(count)
-				moveNumber[count-1]++;
-		}//:end of count loop
+			if(count) //if we're gonna check some more,
+				moveNumber[count-1]++; //wouldnt want to check the same branch twice
+
+		}//:end of count loop. We have chosen a move for black.
 
 		//make move on official board:
-		movePiece(scoreToBeat[1][0],scoreToBeat[2][0],scoreToBeat[3][0]);
+		movePiece(scoreToBeat[1][0],scoreToBeat[2][0],scoreToBeat[3][0]); //makes move to board
 		for(i=0;i<8;i++){
 			for(j=0;j<8;j++)
 				officialBoard[i][j]=board[i][j];
 		}
 
+		//print officialBoard on screen:
 		for(i=0;i<8;i++){
 			for(j=0;j<8;j++)
 				printf("%2i ",officialBoard[i][j]);
@@ -134,6 +157,7 @@ int main(void){
 		}
 		printf("\n");
 
+		//save:
 		outfile = fopen("saved_game.txt","w");
 		for(i=0;i<8;i++){
 			for(j=0;j<8;j++)
@@ -141,11 +165,15 @@ int main(void){
 			fprintf(outfile,"\n");
 		}
 		fclose(outfile);
-	}//:end of game
+
+	} //back to top
+
 	return 0;
 }
 
-//returns 1 if successful, else 0:
+//moves the piece at the specified row and column. Skipto is the (n-1)'th available move for this piece. If there are only two available moves for this piece, skipto can be 0 or 1.
+//if skipto is too large, or there are no moves available at this location, then movepiece returns 0. if movepiece successfully modifies board, then it returns 1.
+//only the first part of this function is thoroughly commented to avoid redundancy
 int movePiece(int row, int col, int skipto){
 	int i, moveNum=0;
 
@@ -154,16 +182,16 @@ int movePiece(int row, int col, int skipto){
 
 	if(board[row][col]<E){
 		if(board[row][col]==BP){
-			if(row==6){
-				if(board[7][col]==E){
+			if(row==6){ //if its one away from end
+				if(board[7][col]==E){ //move forward
 					if(moveNum==skipto){
 						board[7][col]=BQ;
 						board[6][col]=E;
 						return 1;
 					}
-					moveNum++;
+					moveNum++; //this move is available, but it's not the one we're looking for.
 				}
-				if(col!=7 && board[7][col+1]>E){
+				if(col!=7 && board[7][col+1]>E){ //attack diagonal
 					if(moveNum==skipto){
 						board[7][col+1]=BQ;
 						board[6][col]=E;
@@ -177,7 +205,7 @@ int movePiece(int row, int col, int skipto){
 					return 1;
 				}
 			}
-			else{
+			else{ //not one away from the end
 				if(board[row+1][col]==E){
 					if(moveNum==skipto){
 						board[row+1][col]=BP;
@@ -202,26 +230,27 @@ int movePiece(int row, int col, int skipto){
 					}
 					moveNum++;
 				}
-				if(row==1 && board[3][col]==E && board[2][col]==E && moveNum==skipto){
+				if(row==1 && board[3][col]==E && board[2][col]==E && moveNum==skipto){ //can move forward two if not moved yet
 					board[3][col]=BP;
 					board[1][col]=E;
 					return 1;
 				}
 			}
+
 			return 0;
 		}//BLACK PAWN
 		
 		if(board[row][col]==BR){
-			i=1;
+			i=1; //start looking for moves one away
 			//move down:
-			while(board[row+i][col]==E && row+i<8){
-				if(moveNum==skipto){
+			while(board[row+i][col]==E && row+i<8){ //while we can still keep moving in this direction
+				if(moveNum==skipto){ //only aaactually move the piece if that's the move that we want to do.
 					board[row+i][col]=BR;
 					board[row][col]=E;
 					return 1;
 				}
 				moveNum++;
-				i++;
+				i++; //check one extra space away
 			}
 			if(board[row+i][col]>E && row+i<8){
 				if(moveNum==skipto){
@@ -231,7 +260,8 @@ int movePiece(int row, int col, int skipto){
 				}
 				moveNum++;
 			}
-			i=1;
+
+			i=1; //look one away in a new direction
 			//move up:
 			while(board[row-i][col]==E && row-i>=0){
 				if(moveNum==skipto){
@@ -1212,14 +1242,17 @@ int movePiece(int row, int col, int skipto){
 	return 0;
 }
 
+//adds up the score from each piece on the board. Black pieces have a negative score, and white has a positive score.
+//returns the total score associated with the board (negative if black is winning else non-negative)
 int evalBoard(void){
 	int row, col, score=0;
 
 	for(row=0;row<8;row++){
 		for(col=0;col<8;col++){
 			if(board[row][col]>E){
+
 				if(board[row][col]==WP){
-					if(row==1)
+					if(row==1) //at the end
 						score+=20;
 					else
 						score+=10;
@@ -1233,11 +1266,11 @@ int evalBoard(void){
 				else if(board[row][col]==WQ)
 					score+=80;
 				else if(board[row][col]==WK)
-					score+=1580;
+					score+=1580; 
 			}
 			else if(board[row][col]<E){
 				if(board[row][col]==BP){
-					if(row==6)
+					if(row==6) //at the end
 						score-=20;
 					else
 						score-=10;
@@ -1246,7 +1279,7 @@ int evalBoard(void){
 					score-=50;
 				else if(board[row][col]==BB){
 					score-=30;
-					if(row>1 && row<6 && col>1 && col<6)
+					if(row>1 && row<6 && col>1 && col<6) //good positioning is to be in the center extra bonus points to favour this move over a passive move
 						score-=1;
 				}
 				else if(board[row][col]==BN){
@@ -1260,13 +1293,15 @@ int evalBoard(void){
 						score-=1;
 				}
 				else if(board[row][col]==BK)
-					score-=1600;
+					score-=1600; //huge because the program doesnt know about the concept of check. It only knows that saving the king from danger is "important" not "necessary".
 			}
 		}
 	}
+
 	return score;
 }
 
+//prompts the user for a move and gives the option to load, undo, or access info. Move goes to officialBoard.
 void promptMove(void){
 	char move[5];
 	int row1, col1, row2, col2, newPiece, i, j;
@@ -1274,16 +1309,16 @@ void promptMove(void){
 	printf("\nWhite, it's your move.\n");
 	scanf("%s",move);
 
-	if(move[0]=='I' || move[0]=='i'){
+	if(move[0]=='I' || move[0]=='i'){ //info
 		printf("\nIf you would like to move your pawn from A2 to A4, enter 'a2a4' as your move.\nTo castle, move your king to his end location.\nTo undo your last move, type 'UNDO'.\nIf you would like to load a saved game, type 'LOAD'.\n\n\nWhite, it's your move.\n");
 		scanf("%s",move);
 	}
 
-	if(move[0]=='L' || move[0]=='l'){
+	if(move[0]=='L' || move[0]=='l'){ //load
 		infile = fopen("saved_game.txt","r");
 		if(infile==NULL)
 			printf("\nNothing to load...\nWhite, it's your move.\n");
-		else{
+		else{ //display loaded game
 			for(i=0;i<64;i++)
 				fscanf(infile,"%i",&officialBoard[i/8][i%8]);
 			for(i=0;i<8;i++){
@@ -1297,7 +1332,7 @@ void promptMove(void){
 		scanf("%s",move);
 	}
 
-	if(move[0]=='U' || move[0]=='u'){
+	if(move[0]=='U' || move[0]=='u'){ //undo
 		printf("\n");
 		for(i=0;i<8;i++){
 			for(j=0;j<8;j++){
@@ -1310,11 +1345,13 @@ void promptMove(void){
 		scanf("%s",move);
 	}
 
+	//the old board will be behind two moves if it is not updated here.
 	for(i=0;i<8;i++){
 		for(j=0;j<8;j++)
 			oldBoard[i][j]=officialBoard[i][j];
 	}
 
+	//castling
 	if(officialBoard[7][4]==WK && move[0]=='e' && move[1]=='1' && move[2]=='g'){
 		officialBoard[7][4]=E;
 		officialBoard[7][5]=WR;
@@ -1327,12 +1364,14 @@ void promptMove(void){
 		officialBoard[7][2]=WK;
 		officialBoard[7][0]=E;
 	}
+
+	//copy the piece to the new location then delete it from where it was.
 	else{
 		row1=56-move[1];
 		col1=-97+move[0];
 		row2=56-move[3];
 		col2=-97+move[2];
-		if(officialBoard[row1][col1]==WP && row2==0){
+		if(officialBoard[row1][col1]==WP && row2==0){ //if we're moving a pawn to the end, give options on what piece they want.
 			printf("Please choose a piece by entering its corresponding number.\nWhich piece would you like?\nRook:   2\nKnight: 3\nBishop: 4\nQueen:  5\n");
 			scanf("%i",&newPiece);
 			officialBoard[0][col2]=newPiece;
@@ -1341,5 +1380,5 @@ void promptMove(void){
 			officialBoard[row2][col2]=officialBoard[row1][col1];
 		officialBoard[row1][col1]=E;
 	}
-	printf("\nThinking...\n");
+	printf("\nThinking...\n"); //let the human know I'm conscious.
 }
